@@ -600,16 +600,27 @@ func (s *Server) unregister() error {
 }
 
 func (s *Server) appendAddrs(list []dns.RR, ttl uint32, ifIndex int, flushCache bool) []dns.RR {
-	v4 := s.service.AddrIPv4
-	v6 := s.service.AddrIPv6
-	if len(v4) == 0 && len(v6) == 0 {
-		iface, _ := net.InterfaceByIndex(ifIndex)
-		if iface != nil {
-			a4, a6 := addrsForInterface(iface)
-			v4 = append(v4, a4...)
-			v6 = append(v6, a6...)
-		}
-	}
+	// v4 := s.service.AddrIPv4
+	// v6 := s.service.AddrIPv6
+	// if len(v4) == 0 && len(v6) == 0 {
+	// 	iface, _ := net.InterfaceByIndex(ifIndex)
+	// 	if iface != nil {
+	// 		a4, a6 := addrsForInterface(iface)
+	// 		v4 = append(v4, a4...)
+	// 		v6 = append(v6, a6...)
+	// 	}
+	// }
+	iSrc, err := net.InterfaceByIndex(ifIndex)
+        if err == nil {
+                // fmt.Println(i1.Name)
+                for _, i := range s.ifaces {
+                        if i.Name == iSrc.Name {
+                                a4, a6 := addrsForInterface(iSrc)
+                                v4 = append(v4, a4...)
+                                v6 = append(v6, a6...)
+                        }
+                }
+        }
 	if ttl > 0 {
 		// RFC6762 Section 10 says A/AAAA records SHOULD
 		// use TTL of 120s, to account for network interface
