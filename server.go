@@ -610,6 +610,7 @@ func (s *Server) appendAddrs(list []dns.RR, ttl uint32, ifIndex int, flushCache 
 	// 		v6 = append(v6, a6...)
 	// 	}
 	// }
+	var v4, v6 []net.IP
 	iSrc, err := net.InterfaceByIndex(ifIndex)
         if err == nil {
                 // fmt.Println(i1.Name)
