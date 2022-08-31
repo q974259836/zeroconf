@@ -3,7 +3,9 @@ package zeroconf
 import (
 	"context"
 	"fmt"
+	"log"
 	"net"
+	"runtime"
 	"strings"
 
 	"golang.org/x/net/ipv4"
@@ -441,14 +443,28 @@ func (c *client) sendQuery(msg *dns.Msg) error {
 	if c.ipv4conn != nil {
 		var wcm ipv4.ControlMessage
 		for ifi := range c.ifaces {
-			wcm.IfIndex = c.ifaces[ifi].Index
+			switch runtime.GOOS {
+			case "darwin", "ios", "linux":
+				wcm.IfIndex = c.ifaces[ifi].Index
+			default:
+				if err := c.ipv4conn.SetMulticastInterface(&c.ifaces[ifi]); err != nil {
+					log.Printf("[WARN] mdns: Failed to set multicast interface: %v", err)
+				}
+			}
 			c.ipv4conn.WriteTo(buf, &wcm, ipv4Addr)
 		}
 	}
 	if c.ipv6conn != nil {
 		var wcm ipv6.ControlMessage
 		for ifi := range c.ifaces {
-			wcm.IfIndex = c.ifaces[ifi].Index
+			switch runtime.GOOS {
+			case "darwin", "ios", "linux":
+				wcm.IfIndex = c.ifaces[ifi].Index
+			default:
+				if err := c.ipv6conn.SetMulticastInterface(&c.ifaces[ifi]); err != nil {
+					log.Printf("[WARN] mdns: Failed to set multicast interface: %v", err)
+				}
+			}
 			c.ipv6conn.WriteTo(buf, &wcm, ipv6Addr)
 		}
 	}

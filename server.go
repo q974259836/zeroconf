@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"net"
 	"os"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -612,16 +613,16 @@ func (s *Server) appendAddrs(list []dns.RR, ttl uint32, ifIndex int, flushCache 
 	// }
 	var v4, v6 []net.IP
 	iSrc, err := net.InterfaceByIndex(ifIndex)
-        if err == nil {
-                // fmt.Println(i1.Name)
-                for _, i := range s.ifaces {
-                        if i.Name == iSrc.Name {
-                                a4, a6 := addrsForInterface(iSrc)
-                                v4 = append(v4, a4...)
-                                v6 = append(v6, a6...)
-                        }
-                }
-        }
+	if err == nil {
+		// fmt.Println(i1.Name)
+		for _, i := range s.ifaces {
+			if i.Name == iSrc.Name {
+				a4, a6 := addrsForInterface(iSrc)
+				v4 = append(v4, a4...)
+				v6 = append(v6, a6...)
+			}
+		}
+	}
 	if ttl > 0 {
 		// RFC6762 Section 10 says A/AAAA records SHOULD
 		// use TTL of 120s, to account for network interface
@@ -719,11 +720,31 @@ func (s *Server) multicastResponse(msg *dns.Msg, ifIndex int) error {
 	if s.ipv4conn != nil {
 		var wcm ipv4.ControlMessage
 		if ifIndex != 0 {
-			wcm.IfIndex = ifIndex
+			switch runtime.GOOS {
+			case "darwin", "ios", "linux":
+				wcm.IfIndex = ifIndex
+			default:
+				var intf net.Interface
+				for _, intf = range s.ifaces {
+					if intf.Index == ifIndex {
+						break
+					}
+				}
+				if err := s.ipv4conn.SetMulticastInterface(&intf); err != nil {
+					log.Printf("[WARN] mdns: Failed to set multicast interface: %v", err)
+				}
+			}
 			s.ipv4conn.WriteTo(buf, &wcm, ipv4Addr)
 		} else {
 			for _, intf := range s.ifaces {
-				wcm.IfIndex = intf.Index
+				switch runtime.GOOS {
+				case "darwin", "ios", "linux":
+					wcm.IfIndex = intf.Index
+				default:
+					if err := s.ipv4conn.SetMulticastInterface(&intf); err != nil {
+						log.Printf("[WARN] mdns: Failed to set multicast interface: %v", err)
+					}
+				}
 				s.ipv4conn.WriteTo(buf, &wcm, ipv4Addr)
 			}
 		}
@@ -733,10 +754,32 @@ func (s *Server) multicastResponse(msg *dns.Msg, ifIndex int) error {
 		var wcm ipv6.ControlMessage
 		if ifIndex != 0 {
 			wcm.IfIndex = ifIndex
+			switch runtime.GOOS {
+			case "darwin", "ios", "linux":
+				wcm.IfIndex = ifIndex
+			default:
+				var intf net.Interface
+				for _, intf = range s.ifaces {
+					if intf.Index == ifIndex {
+						break
+					}
+				}
+				if err := s.ipv6conn.SetMulticastInterface(&intf); err != nil {
+					log.Printf("[WARN] mdns: Failed to set multicast interface: %v", err)
+				}
+			}
 			s.ipv6conn.WriteTo(buf, &wcm, ipv6Addr)
 		} else {
 			for _, intf := range s.ifaces {
 				wcm.IfIndex = intf.Index
+				switch runtime.GOOS {
+				case "darwin", "ios", "linux":
+					wcm.IfIndex = intf.Index
+				default:
+					if err := s.ipv6conn.SetMulticastInterface(&intf); err != nil {
+						log.Printf("[WARN] mdns: Failed to set multicast interface: %v", err)
+					}
+				}
 				s.ipv6conn.WriteTo(buf, &wcm, ipv6Addr)
 			}
 		}
